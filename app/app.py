@@ -75,17 +75,19 @@ if uploaded_file is not None or (use_example_data and df is not None):
         
         # Different plot types need different column selections
         if plot_type in ["Line", "Scatter", "Bar"]:
-            x_col = st.selectbox("X-axis", df.columns.tolist())
-            # Filter out the X column from Y options to prevent duplicates
-            y_options = [col for col in numeric_columns if col != x_col]
-            
-            if not y_options and len(numeric_columns) > 0:
-                st.warning(f"You selected '{x_col}' for X-axis. Please choose different columns for Y-axis.")
-                # Add back the X column as an option but with a warning
-                y_options = numeric_columns
+            col1, col2 = st.columns(2)
+            with col1:
+                x_col = st.selectbox("X-axis", df.columns.tolist())
+                # Filter out the X column from Y options to prevent duplicates
+                y_options = [col for col in numeric_columns if col != x_col]
                 
-            y_cols = st.multiselect("Y-axis", y_options, 
-                                   default=[y_options[0]] if y_options else [])
+                if not y_options and len(numeric_columns) > 0:
+                    st.warning(f"You selected '{x_col}' for X-axis. Please choose different columns for Y-axis.")
+                    # Add back the X column as an option but with a warning
+                    y_options = numeric_columns
+            with col2:  
+                y_cols = st.multiselect("Y-axis", y_options, 
+                                    default=[y_options[0]] if y_options else [])
                 
             # Warning if they try to select same column for X and Y
             if x_col in y_cols:

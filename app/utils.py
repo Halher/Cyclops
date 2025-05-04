@@ -11,7 +11,7 @@ def get_example_data():
             return pd.read_csv("example.csv")
         else:
             # Create some example data if file doesn't exist
-            x = np.linspace(0, 10, 100)
+            x = np.linspace(0, 50, 1000)
             df = pd.DataFrame({
                 'x': x,
                 'sin(x)': np.sin(x),
