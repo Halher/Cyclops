@@ -164,6 +164,30 @@ if uploaded_file is not None or (use_example_data and df is not None):
             with col2:
                 y_label = st.text_input("Y-axis Label", "Value")
                 
+            # FEATURE 3: Axis Limits Customization
+            st.subheader("Axis Limits")
+            use_custom_xlim = st.toggle("Customize X-axis limits", False)
+            if use_custom_xlim and plot_type not in ["Box", "Heatmap"]:
+                col1, col2 = st.columns(2)
+                with col1:
+                    x_min = st.number_input("X min", value=0.0, format="%.6f")
+                with col2:
+                    x_max = st.number_input("X max", value=1.0, format="%.6f")
+                if x_min >= x_max:
+                    st.warning("X min must be less than X max. Using default limits.")
+                    use_custom_xlim = False
+            
+            use_custom_ylim = st.toggle("Customize Y-axis limits", False)
+            if use_custom_ylim:
+                col1, col2 = st.columns(2)
+                with col1:
+                    y_min = st.number_input("Y min", value=0.0, format="%.6f")
+                with col2:
+                    y_max = st.number_input("Y max", value=1.0, format="%.6f")
+                if y_min >= y_max:
+                    st.warning("Y min must be less than Y max. Using default limits.")
+                    use_custom_ylim = False
+            
             # FEATURE 2: Legend Customization
             st.subheader("Legend Customization")
             show_legend = st.toggle("Show Legend", True)
@@ -406,6 +430,13 @@ if uploaded_file is not None or (use_example_data and df is not None):
                     ax.set_xlabel("Columns")
                     ax.set_ylabel("Columns")
                 
+                # FEATURE 3: Apply custom axis limits if specified
+                if use_custom_xlim and plot_type not in ["Box", "Heatmap"]:
+                    ax.set_xlim(x_min, x_max)
+                
+                if use_custom_ylim:
+                    ax.set_ylim(y_min, y_max)
+                
                 if title:
                     ax.set_title(title)
 
@@ -453,5 +484,5 @@ else:
 # Add a footer with date information
 st.markdown("""
 ---
-*Data Plotting App | mxdbck | Last Updated: 2025-05-03 16:24:33*
+*Data Plotting App | mxdbck | Last Updated: 04-25-2025 17:06*
 """)
