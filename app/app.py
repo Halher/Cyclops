@@ -472,7 +472,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
                     buf = io.BytesIO()
                     fig.savefig(buf, format=format_type, bbox_inches='tight')
                     buf.seek(0)
-                    return base64.b64encode(buf.read()).decode()
+                    return buf.getvalue()
                 
                 with col1:
                     st.download_button(label="Export as PNG", data=get_download_link(fig, 'png'), file_name="plot.png")
