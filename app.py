@@ -133,15 +133,44 @@ if uploaded_file is not None or (use_example_data and df is not None):
             if x_col in y_cols:
                 st.warning(f"You've selected '{x_col}' for both X and Y axes. This may cause plotting errors.")
                 
+            # NEW: Add range sliders for X and Y axes percentages
+            st.subheader("Data Range Filters")
+            
+            col1, col2 = st.columns(2)
+
+
+            # X-axis range slider
+            with col1:
+                st.write("#### X-axis Range (Percentiles)")
+                x_range = st.slider("X-axis Percentile Range", 0.0, 100.0, (0.0, 100.0), 0.1, 
+                                format="%.1f%%")
+            
+            # Y-axis range slider
+            with col2:
+                st.write("#### Y-axis Range (Percentiles)")
+                y_range = st.slider("Y-axis Percentile Range", 0.0, 100.0, (0.0, 100.0), 0.1,
+                                format="%.1f%%")
+                
         elif plot_type in ["Histogram", "Box"]:
             y_cols = st.multiselect("Select columns", numeric_columns, 
                                    default=[numeric_columns[0]] if numeric_columns else [])
             x_col = None
+            
+            # NEW: Add range slider for Y axis only (no X-axis for these plots)
+            st.subheader("Data Range Filters")
+            st.write("#### Value Range (Percentiles)")
+            y_range = st.slider("Value Percentile Range", 0.0, 100.0, (0.0, 100.0), 0.1,
+                              format="%.1f%%")
+            x_range = (0.0, 100.0)  # Default full range for X
+                
         elif plot_type == "Heatmap":
             corr_cols = st.multiselect("Select columns for correlation", numeric_columns, 
                                      default=numeric_columns[:min(5, len(numeric_columns))])
             x_col = None
             y_cols = corr_cols
+            # No range sliders needed for heatmap
+            x_range = (0.0, 100.0)
+            y_range = (0.0, 100.0)
         
         # Plot customization options
         st.subheader("Plot Customization")
@@ -167,7 +196,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
 
             
         # NEW: Equal axes option
-            
+
         # Custom axis labels
         col1, col2 = st.columns(2)
         with col1:
@@ -185,6 +214,43 @@ if uploaded_file is not None or (use_example_data and df is not None):
                 plt.style.use(['science', 'no-latex'])
             else:
                 plt.style.use('default')
+            
+            # NEW: Filter the data based on the percentile ranges
+            filtered_df = df.copy()
+            
+            if plot_type in ["Line", "Scatter", "Bar"]:
+                # Filter X-axis data based on percentiles
+                if x_range != (0.0, 100.0):
+                    x_min = np.percentile(filtered_df[x_col], x_range[0])
+                    x_max = np.percentile(filtered_df[x_col], x_range[1])
+                    filtered_df = filtered_df[(filtered_df[x_col] >= x_min) & (filtered_df[x_col] <= x_max)]
+                
+                # Filter Y-axis data based on percentiles for each column
+                if y_range != (0.0, 100.0):
+                    y_mask = pd.Series(True, index=filtered_df.index)
+                    for col in y_cols:
+                        y_min = np.percentile(df[col], y_range[0])
+                        y_max = np.percentile(df[col], y_range[1])
+                        y_mask = y_mask & (filtered_df[col] >= y_min) & (filtered_df[col] <= y_max)
+                    filtered_df = filtered_df[y_mask]
+            
+            elif plot_type in ["Histogram", "Box"] and y_range != (0.0, 100.0):
+                # Filter data for histogram/box plots
+                # Create a mask that includes rows where ANY of the selected columns are within the range
+                mask = pd.Series(False, index=filtered_df.index)
+                for col in y_cols:
+                    y_min = np.percentile(df[col], y_range[0])
+                    y_max = np.percentile(df[col], y_range[1])
+                    mask = mask | ((filtered_df[col] >= y_min) & (filtered_df[col] <= y_max))
+                filtered_df = filtered_df[mask]
+            
+            # Check if we still have data after filtering
+            if len(filtered_df) == 0:
+                st.error("No data points remain after applying the filters. Please adjust your percentile ranges.")
+                st.stop()
+                
+            # Display how many points were kept after filtering
+            st.info(f"Using {len(filtered_df)} out of {len(df)} data points ({len(filtered_df)/len(df)*100:.1f}%) after filtering.")
             
             fig, ax = plt.subplots(figsize=(fig_width, fig_height))
             
@@ -205,7 +271,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
                         for col in y_cols:
                             if col == x_col:
                                 continue  # Skip plotting a column against itself
-                            ax.plot(df[x_col], df[col], label=col)
+                            ax.plot(filtered_df[x_col], filtered_df[col], label=col)
                         ax.grid(grid)
                         if title:
                             ax.set_title(title)
@@ -216,7 +282,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
                     else:
                         # Normal case: use pandas plot
                         for col in y_cols:
-                            df.plot(kind='line', x=x_col, y=col, ax=ax, grid=grid)
+                            filtered_df.plot(kind='line', x=x_col, y=col, ax=ax, grid=grid)
                         # Set custom axis labels
                         ax.set_xlabel(x_label)
                         ax.set_ylabel(y_label)
@@ -226,7 +292,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
                         for col in y_cols:
                             if col == x_col:
                                 continue  # Skip plotting a column against itself
-                            ax.scatter(df[x_col], df[col], label=col)
+                            ax.scatter(filtered_df[x_col], filtered_df[col], label=col)
                         ax.grid(grid)
                         if title:
                             ax.set_title(title)
@@ -237,7 +303,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
                     else:
                         # Normal case
                         for col in y_cols:
-                            df.plot(kind='scatter', x=x_col, y=col, ax=ax, grid=grid)
+                            filtered_df.plot(kind='scatter', x=x_col, y=col, ax=ax, grid=grid)
                         # Set custom axis labels
                         ax.set_xlabel(x_label)
                         ax.set_ylabel(y_label)
@@ -247,7 +313,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
                         for col in y_cols:
                             if col == x_col:
                                 continue  # Skip plotting a column against itself
-                            ax.bar(df[x_col], df[col], label=col, alpha=0.7)
+                            ax.bar(filtered_df[x_col], filtered_df[col], label=col, alpha=0.7)
                         ax.grid(grid)
                         if title:
                             ax.set_title(title)
@@ -258,26 +324,26 @@ if uploaded_file is not None or (use_example_data and df is not None):
                     else:
                         # Normal case
                         for col in y_cols:
-                            df.plot(kind='bar', x=x_col, y=col, ax=ax, grid=grid)
+                            filtered_df.plot(kind='bar', x=x_col, y=col, ax=ax, grid=grid)
                         # Set custom axis labels
                         ax.set_xlabel(x_label)
                         ax.set_ylabel(y_label)
                 elif plot_type == "Histogram":
                     for col in y_cols:
-                        ax.hist(df[col].dropna(), alpha=0.7, label=col)
+                        ax.hist(filtered_df[col].dropna(), alpha=0.7, label=col)
                     ax.grid(grid)
                     # Set custom axis labels
                     ax.set_xlabel("Values")
                     ax.set_ylabel("Frequency")
                     ax.legend(loc=legend_pos)
                 elif plot_type == "Box":
-                    ax.boxplot([df[col].dropna() for col in y_cols], labels=y_cols)
+                    ax.boxplot([filtered_df[col].dropna() for col in y_cols], labels=y_cols)
                     ax.grid(grid)
                     # Set custom axis labels
                     ax.set_xlabel("Columns")
                     ax.set_ylabel("Values")
                 elif plot_type == "Heatmap":
-                    corr = df[y_cols].corr()
+                    corr = filtered_df[y_cols].corr()
                     im = ax.imshow(corr, cmap='coolwarm')
                     plt.colorbar(im, ax=ax)
                     # Add correlation values in the cells
@@ -294,11 +360,14 @@ if uploaded_file is not None or (use_example_data and df is not None):
                 
                 if title:
                     ax.set_title(title)
-                    
+
+                _, col, _ = st.columns([1, 2, 1])
+
                 # Display the plot
-                st.pyplot(fig)
+                with col:
+                    st.pyplot(fig)
                 
-                # NEW: Show statistics only if checkbox is checked
+                # Show statistics only if checkbox is checked
                 show_stats = st.checkbox("Show Statistics", False)
                 
                 if show_stats:
@@ -311,38 +380,38 @@ if uploaded_file is not None or (use_example_data and df is not None):
                         if plot_type in ["Line", "Scatter", "Bar"]:
                             # For X-Y plots, show stats for both X and Y columns
                             st.write("#### X-axis Statistics")
-                            st.write(df[x_col].describe().to_frame().T)
+                            st.write(filtered_df[x_col].describe().to_frame().T)
                             
                             st.write("#### Y-axis Statistics")
-                            y_stats = df[y_cols].describe().T
+                            y_stats = filtered_df[y_cols].describe().T
                             st.write(y_stats)
                             
                             # Add range (max-min) to the statistics
                             st.write("#### Value Ranges")
                             ranges = pd.DataFrame({
                                 'Column': [x_col] + y_cols,
-                                'Range (Max-Min)': [df[x_col].max() - df[x_col].min()] + 
-                                                [df[col].max() - df[col].min() for col in y_cols],
-                                'IQR (Q3-Q1)': [df[x_col].quantile(0.75) - df[x_col].quantile(0.25)] + 
-                                            [df[col].quantile(0.75) - df[col].quantile(0.25) for col in y_cols]
+                                'Range (Max-Min)': [filtered_df[x_col].max() - filtered_df[x_col].min()] + 
+                                                [filtered_df[col].max() - filtered_df[col].min() for col in y_cols],
+                                'IQR (Q3-Q1)': [filtered_df[x_col].quantile(0.75) - filtered_df[x_col].quantile(0.25)] + 
+                                            [filtered_df[col].quantile(0.75) - filtered_df[col].quantile(0.25) for col in y_cols]
                             }).set_index('Column')
                             st.write(ranges)
                             
                         elif plot_type in ["Histogram", "Box"]:
                             # For single variable plots
-                            st.write(df[y_cols].describe().T)
+                            st.write(filtered_df[y_cols].describe().T)
                             
                             # Add range and IQR
                             st.write("#### Value Ranges")
                             ranges = pd.DataFrame({
                                 'Column': y_cols,
-                                'Range (Max-Min)': [df[col].max() - df[col].min() for col in y_cols],
-                                'IQR (Q3-Q1)': [df[col].quantile(0.75) - df[col].quantile(0.25) for col in y_cols]
+                                'Range (Max-Min)': [filtered_df[col].max() - filtered_df[col].min() for col in y_cols],
+                                'IQR (Q3-Q1)': [filtered_df[col].quantile(0.75) - filtered_df[col].quantile(0.25) for col in y_cols]
                             }).set_index('Column')
                             st.write(ranges)
                             
                         elif plot_type == "Heatmap":
-                            st.write(df[y_cols].describe().T)
+                            st.write(filtered_df[y_cols].describe().T)
                     
                     with stats_tab2:
                         # Correlation information
@@ -352,13 +421,13 @@ if uploaded_file is not None or (use_example_data and df is not None):
                             columns_to_correlate = y_cols
                         
                         if len(columns_to_correlate) > 1:
-                            corr_matrix = df[columns_to_correlate].corr()
+                            corr_matrix = filtered_df[columns_to_correlate].corr()
                             st.write("#### Pearson Correlation Matrix")
                             st.write(corr_matrix)
                             
                             if len(columns_to_correlate) <= 10:  # Spearman can be computationally intensive
                                 try:
-                                    spearman_corr = df[columns_to_correlate].corr(method='spearman')
+                                    spearman_corr = filtered_df[columns_to_correlate].corr(method='spearman')
                                     st.write("#### Spearman Rank Correlation")
                                     st.write(spearman_corr)
                                 except:
@@ -410,6 +479,7 @@ st.markdown("""
 ### Supported Features:
 - CSV, TXT, and Excel file parsing
 - Multiple plot types: Line, Scatter, Bar, Histogram, Box, and Heatmap
+- Data filtering by percentile ranges
 - Customizable plot parameters (title, axis labels, grid, scales)
 - Linear and logarithmic axis scales
 - Equal axes option for proportional plotting
@@ -421,5 +491,5 @@ st.markdown("""
 # Add a footer with date information
 st.markdown("""
 ---
-*Data Plotting App | mxdbck | Last Updated: 2025-05-03 14:04:05*
+*Data Plotting App | mxdbck | Last Updated: 2025-05-03 16:24:33*
 """)
