@@ -14,7 +14,7 @@ st.set_page_config(page_title="Data Plotting App")
 st.title("Data Plotting App")
 
 # Option to load example data
-use_example_data = st.checkbox("Use example data")
+use_example_data = st.toggle("Use example data")
 
 if use_example_data:
     df = get_example_data()
@@ -43,9 +43,12 @@ if uploaded_file is not None or (use_example_data and df is not None):
             st.error(f"Error reading file: {e}")
             st.stop()
     
-    # Display data preview
-    st.subheader("Data Preview")
-    st.dataframe(df.head())
+    show_preview = st.toggle("Show data preview", value=False)
+
+    if show_preview:
+        # Display data preview
+        st.subheader("Data Preview")
+        st.dataframe(df.head())
     
     # Select columns to plot
     st.subheader("Plot Configuration")
@@ -61,6 +64,14 @@ if uploaded_file is not None or (use_example_data and df is not None):
         with col2:
             theme_options = ["Default Matplotlib", "Science"]
             theme_option = st.selectbox("Theme", theme_options)
+        
+        # FEATURE 1: FFT Option - Add to the top level of configuration
+        fft_col1, fft_col2 = st.columns(2)
+        with fft_col1:
+            use_fft = st.toggle("Apply Fast Fourier Transform (FFT)")
+        with fft_col2:
+            if use_fft:
+                fft_mode = st.selectbox("FFT Type", ["Two-sided", "One-sided"], index=0)
         
         # Different plot types need different column selections
         if plot_type in ["Line", "Scatter", "Bar"]:
@@ -80,30 +91,31 @@ if uploaded_file is not None or (use_example_data and df is not None):
             if x_col in y_cols:
                 st.warning(f"You've selected '{x_col}' for both X and Y axes. This may cause plotting errors.")
                 
-            # NEW: Add range sliders for X and Y axes percentages
-            st.subheader("Data Range Filters")
+            with st.sidebar:
             
-            col1, col2 = st.columns(2)
+                # Add range sliders for X and Y axes percentages
+                st.subheader("Data Range Filters")
+                
+                col1, col2 = st.columns(2)
 
-
-            # X-axis range slider
-            with col1:
-                st.write("#### X-axis Range (Percentiles)")
-                x_range = st.slider("X-axis Percentile Range", 0.0, 100.0, (0.0, 100.0), 0.1, 
-                                format="%.1f%%")
-            
-            # Y-axis range slider
-            with col2:
-                st.write("#### Y-axis Range (Percentiles)")
-                y_range = st.slider("Y-axis Percentile Range", 0.0, 100.0, (0.0, 100.0), 0.1,
-                                format="%.1f%%")
+                # X-axis range slider
+                with col1:
+                    st.write("#### X-axis Range (Percentiles)")
+                    x_range = st.slider("X-axis Percentile Range", 0.0, 100.0, (0.0, 100.0), 0.1, 
+                                    format="%.1f%%")
+                
+                # Y-axis range slider
+                with col2:
+                    st.write("#### Y-axis Range (Percentiles)")
+                    y_range = st.slider("Y-axis Percentile Range", 0.0, 100.0, (0.0, 100.0), 0.1,
+                                    format="%.1f%%")
                 
         elif plot_type in ["Histogram", "Box"]:
             y_cols = st.multiselect("Select columns", numeric_columns, 
                                    default=[numeric_columns[0]] if numeric_columns else [])
             x_col = None
             
-            # NEW: Add range slider for Y axis only (no X-axis for these plots)
+            # Add range slider for Y axis only (no X-axis for these plots)
             st.subheader("Data Range Filters")
             st.write("#### Value Range (Percentiles)")
             y_range = st.slider("Value Percentile Range", 0.0, 100.0, (0.0, 100.0), 0.1,
@@ -119,35 +131,75 @@ if uploaded_file is not None or (use_example_data and df is not None):
             x_range = (0.0, 100.0)
             y_range = (0.0, 100.0)
         
-        # Plot customization options
-        st.subheader("Plot Customization")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            fig_width = st.slider("Figure Width", min_value=4, max_value=40, value=10)
-            title = st.text_input("Plot Title", "")
-            
-            # Axis scale options
-            x_scale = st.selectbox("X-axis Scale", ["Linear", "Log"])
+        with st.sidebar:
 
-            grid = st.checkbox("Show Grid", True)
+            # Plot customization options
+            st.subheader("Plot Customization")
             
-        with col2:
-            fig_height = st.slider("Figure Height", min_value=4, max_value=40, value=6)
-            legend_pos = st.selectbox("Legend Position", ["best", "upper right", "upper left", "lower right", "lower left"])
-            
-            # Y-axis scale
-            y_scale = st.selectbox("Y-axis Scale", ["Linear", "Log"])
+            col1, col2 = st.columns(2)
+            with col1:
+                fig_width = st.slider("Figure Width", min_value=4, max_value=40, value=10)
+                title = st.text_input("Plot Title", "")
+                
+                # Axis scale options
+                x_scale = st.selectbox("X-axis Scale", ["Linear", "Log"])
 
-            equal_axes = st.checkbox("Equal Axes Scales", False)
+                grid = st.toggle("Show Grid", True)
+                
+            with col2:
+                fig_height = st.slider("Figure Height", min_value=4, max_value=40, value=6)
+                legend_pos = st.selectbox("Legend Position", ["best", "upper right", "upper left", "lower right", "lower left"])
+                
+                # Y-axis scale
+                y_scale = st.selectbox("Y-axis Scale", ["Linear", "Log"])
 
-        # Custom axis labels
-        col1, col2 = st.columns(2)
-        with col1:
-            x_label = st.text_input("X-axis Label", "" if x_col is None else x_col)
-        with col2:
-            y_label = st.text_input("Y-axis Label", "Value")
+                equal_axes = st.toggle("Equal Axes Scales", False)
+
+            # Custom axis labels
+            col1, col2 = st.columns(2)
+            with col1:
+                x_label = st.text_input("X-axis Label", "" if x_col is None else x_col)
+            with col2:
+                y_label = st.text_input("Y-axis Label", "Value")
+                
+            # FEATURE 2: Legend Customization
+            st.subheader("Legend Customization")
+            show_legend = st.toggle("Show Legend", True)
             
+            # Only show custom legend labels if legend is enabled
+            if show_legend and plot_type != "Heatmap":
+                # For plots that use y_cols for the legend
+                if plot_type in ["Line", "Scatter", "Bar", "Histogram"]:
+                    st.write("Custom Legend Labels:")
+                    # Create a dictionary to store custom labels for each column
+                    custom_labels = {}
+                    
+                    # Only show for columns actually being plotted
+                    cols_to_customize = y_cols
+                    if plot_type in ["Line", "Scatter", "Bar"] and x_col in y_cols:
+                        # Don't show option for x_col when it's also used as y_col
+                        cols_to_customize = [col for col in y_cols if col != x_col]
+                    
+                    # Create two columns to display legend label inputs
+                    legend_cols = st.columns(2)
+                    for i, col_name in enumerate(cols_to_customize):
+                        with legend_cols[i % 2]:
+                            custom_label = st.text_input(f"Label for {col_name}", col_name)
+                            custom_labels[col_name] = custom_label
+                
+                # For box plots, which use y_cols as labels directly
+                elif plot_type == "Box":
+                    st.write("Custom Legend Labels:")
+                    custom_labels = {}
+                    legend_cols = st.columns(2)
+                    for i, col_name in enumerate(y_cols):
+                        with legend_cols[i % 2]:
+                            custom_label = st.text_input(f"Label for {col_name}", col_name)
+                            custom_labels[col_name] = custom_label
+            else:
+                # Initialize empty custom labels if legend is disabled
+                custom_labels = {}
+                
         # Generate plot if columns selected
         if (plot_type in ["Histogram", "Box"] and y_cols) or \
            (plot_type in ["Line", "Scatter", "Bar"] and x_col and y_cols) or \
@@ -159,7 +211,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
             else:
                 plt.style.use('default')
             
-            # NEW: Filter the data based on the percentile ranges
+            # Filter the data based on the percentile ranges
             filtered_df = df.copy()
             
             if plot_type in ["Line", "Scatter", "Bar"]:
@@ -209,83 +261,133 @@ if uploaded_file is not None or (use_example_data and df is not None):
                 ax.set_aspect('equal')
             
             try:
+                # FEATURE 1: Pre-process data for FFT if needed, but keep plotting logic unified
+                if use_fft and plot_type in ["Line", "Scatter", "Bar"]:
+                    # We'll transform the dataset into an FFT dataset but keep the same structure
+                    fft_df = pd.DataFrame()
+                    
+                    # Sort data by x_col for proper FFT computation
+                    sorted_df = filtered_df.sort_values(by=x_col)
+                    
+                    # Calculate sampling frequency
+                    x_values = sorted_df[x_col].values
+                    if len(x_values) > 1:
+                        # Estimate sampling frequency using the median of differences
+                        dx = np.median(np.diff(x_values))
+                        fs = 1 / dx if dx != 0 else 1
+                    else:
+                        fs = 1  # Default if we can't determine
+                    
+                    # Calculate FFT for each selected column
+                    for col in y_cols:
+                        if col == x_col:
+                            continue  # Skip if column is the same as x_col
+                        
+                        y_values = sorted_df[col].values
+                        N = len(y_values)
+                        
+                        # Calculate FFT based on mode
+                        if fft_mode == "One-sided":
+                            fft_result = np.fft.rfft(y_values)
+                            freq_bins = np.fft.rfftfreq(N, d=1/fs)
+                        else:  # Two-sided
+                            fft_result = np.fft.fft(y_values)
+                            freq_bins = np.fft.fftfreq(N, d=1/fs)
+                        
+                        fft_magnitude = np.abs(fft_result)
+                        
+                        # Add to new dataframe
+                        if col == y_cols[0]:
+                            # Initialize with frequency bins as x-values
+                            fft_df[x_col] = freq_bins
+                        
+                        fft_df[col] = fft_magnitude
+                    
+                    # Replace the original dataframe with the FFT one for plotting
+                    filtered_df = fft_df
+                    
+                    # Update labels for FFT
+                    if x_label == x_col:
+                        x_label = x_label
+                    if y_label == "Value":
+                        y_label = y_label
+                
+                # Now proceed with unified plotting logic for both regular and FFT data
                 if plot_type == "Line":
-                    # Use matplotlib directly instead of pandas plot when x_col is in y_cols
-                    if x_col in y_cols:
-                        for col in y_cols:
-                            if col == x_col:
-                                continue  # Skip plotting a column against itself
-                            ax.plot(filtered_df[x_col], filtered_df[col], label=col)
-                        ax.grid(grid)
-                        if title:
-                            ax.set_title(title)
-                        # Set custom axis labels
-                        ax.set_xlabel(x_label)
-                        ax.set_ylabel(y_label)
+                    for col in y_cols:
+                        if col == x_col and not use_fft:
+                            continue  # Skip plotting a column against itself for normal plots
+                            
+                        # Get custom label if specified, otherwise use column name
+                        label = custom_labels.get(col, col) if show_legend else "_nolegend_"
+                        ax.plot(filtered_df[x_col], filtered_df[col], label=label)
+                    
+                    ax.grid(grid)
+                    # Set custom axis labels
+                    ax.set_xlabel(x_label)
+                    ax.set_ylabel(y_label)
+                    if show_legend:
                         ax.legend(loc=legend_pos)
-                    else:
-                        # Normal case: use pandas plot
-                        for col in y_cols:
-                            filtered_df.plot(kind='line', x=x_col, y=col, ax=ax, grid=grid)
-                        # Set custom axis labels
-                        ax.set_xlabel(x_label)
-                        ax.set_ylabel(y_label)
+                
                 elif plot_type == "Scatter":
-                    # Use matplotlib directly when x_col is in y_cols
-                    if x_col in y_cols:
-                        for col in y_cols:
-                            if col == x_col:
-                                continue  # Skip plotting a column against itself
-                            ax.scatter(filtered_df[x_col], filtered_df[col], label=col)
-                        ax.grid(grid)
-                        if title:
-                            ax.set_title(title)
-                        # Set custom axis labels
-                        ax.set_xlabel(x_label)
-                        ax.set_ylabel(y_label)
+                    for col in y_cols:
+                        if col == x_col and not use_fft:
+                            continue  # Skip plotting a column against itself for normal plots
+                            
+                        # Get custom label if specified, otherwise use column name
+                        label = custom_labels.get(col, col) if show_legend else "_nolegend_"
+                        ax.scatter(filtered_df[x_col], filtered_df[col], label=label)
+                    
+                    ax.grid(grid)
+                    # Set custom axis labels
+                    ax.set_xlabel(x_label)
+                    ax.set_ylabel(y_label)
+                    if show_legend:
                         ax.legend(loc=legend_pos)
-                    else:
-                        # Normal case
-                        for col in y_cols:
-                            filtered_df.plot(kind='scatter', x=x_col, y=col, ax=ax, grid=grid)
-                        # Set custom axis labels
-                        ax.set_xlabel(x_label)
-                        ax.set_ylabel(y_label)
+                
                 elif plot_type == "Bar":
-                    # Use matplotlib directly when x_col is in y_cols
-                    if x_col in y_cols:
-                        for col in y_cols:
-                            if col == x_col:
-                                continue  # Skip plotting a column against itself
-                            ax.bar(filtered_df[x_col], filtered_df[col], label=col, alpha=0.7)
-                        ax.grid(grid)
-                        if title:
-                            ax.set_title(title)
-                        # Set custom axis labels
-                        ax.set_xlabel(x_label)
-                        ax.set_ylabel(y_label)
+                    for col in y_cols:
+                        if col == x_col and not use_fft:
+                            continue  # Skip plotting a column against itself for normal plots
+                        
+                        # Get custom label if specified, otherwise use column name
+                        label = custom_labels.get(col, col) if show_legend else "_nolegend_"
+                        ax.bar(filtered_df[x_col], filtered_df[col], label=label, alpha=0.7)
+                    
+                    ax.grid(grid)
+                    # Set custom axis labels
+                    ax.set_xlabel(x_label)
+                    ax.set_ylabel(y_label)
+                    if show_legend:
                         ax.legend(loc=legend_pos)
-                    else:
-                        # Normal case
-                        for col in y_cols:
-                            filtered_df.plot(kind='bar', x=x_col, y=col, ax=ax, grid=grid)
-                        # Set custom axis labels
-                        ax.set_xlabel(x_label)
-                        ax.set_ylabel(y_label)
+                
                 elif plot_type == "Histogram":
                     for col in y_cols:
-                        ax.hist(filtered_df[col].dropna(), alpha=0.7, label=col)
+                        # Get custom label if specified, otherwise use column name
+                        label = custom_labels.get(col, col) if show_legend else "_nolegend_"
+                        ax.hist(filtered_df[col].dropna(), alpha=0.7, label=label)
+                    
                     ax.grid(grid)
                     # Set custom axis labels
                     ax.set_xlabel("Values")
                     ax.set_ylabel("Frequency")
-                    ax.legend(loc=legend_pos)
+                    if show_legend:
+                        ax.legend(loc=legend_pos)
+                
                 elif plot_type == "Box":
-                    ax.boxplot([filtered_df[col].dropna() for col in y_cols], labels=y_cols)
+                    # For box plots, we need to customize the labels differently
+                    if custom_labels and show_legend:
+                        # Create a list of custom labels in the same order as y_cols
+                        box_labels = [custom_labels.get(col, col) for col in y_cols]
+                    else:
+                        box_labels = y_cols if show_legend else [""] * len(y_cols)
+                        
+                    ax.boxplot([filtered_df[col].dropna() for col in y_cols], labels=box_labels)
                     ax.grid(grid)
                     # Set custom axis labels
                     ax.set_xlabel("Columns")
                     ax.set_ylabel("Values")
+                
                 elif plot_type == "Heatmap":
                     corr = filtered_df[y_cols].corr()
                     im = ax.imshow(corr, cmap='coolwarm')
