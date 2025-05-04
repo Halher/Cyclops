@@ -4,39 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import io
 import base64
-import os
-from matplotlib.figure import Figure
+import scienceplots
 
-# Try to import SciencePlots
-try:
-    import scienceplots
-    HAS_SCIENCEPLOTS = True
-except ImportError:
-    HAS_SCIENCEPLOTS = False
+from stats import display_stats
+from utils import get_example_data
 
-st.set_page_config(page_title="Data Plotting App", layout="wide")
+st.set_page_config(page_title="Data Plotting App")
 
 st.title("Data Plotting App")
-
-# Function to get default example data
-def get_example_data():
-    try:
-        # Check if example.csv exists in the same directory
-        if os.path.exists("example.csv"):
-            return pd.read_csv("example.csv")
-        else:
-            # Create some example data if file doesn't exist
-            x = np.linspace(0, 10, 100)
-            df = pd.DataFrame({
-                'x': x,
-                'sin(x)': np.sin(x),
-                'cos(x)': np.cos(x),
-                'exp(x/10)': np.exp(x/10)
-            })
-            return df
-    except Exception as e:
-        st.error(f"Error loading example data: {e}")
-        return None
 
 # Option to load example data
 use_example_data = st.checkbox("Use example data")
@@ -56,36 +31,14 @@ if uploaded_file is not None or (use_example_data and df is not None):
         file_type = uploaded_file.name.split('.')[-1].lower()
         
         try:
-            if file_type == 'csv':
-                # Let user specify delimiter and handle quoting
-                delimiter = st.text_input("Specify delimiter (leave empty for auto-detection)", ",")
-                if delimiter == "":
-                    delimiter = ','
-                    
-                # Add options for CSV parsing
-                header_option = st.selectbox("Header row", ["First row is header", "No header"])
-                header = 0 if header_option == "First row is header" else None
+            # Let user specify delimiter and handle quoting
+            delimiter = st.text_input("Specify delimiter (leave empty for auto-detection)", ",")
+            delimiter = delimiter if delimiter else None
                 
-                # Parse with more options
-                df = pd.read_csv(
-                    uploaded_file, 
-                    delimiter=delimiter,
-                    header=header,
-                    quotechar='"',  # Handle quoted values
-                    dtype=float,     # Try to convert everything to float for scientific notation
-                )
-                
-                # If no header was provided, generate column names
-                if header is None:
-                    df.columns = [f'Column_{i+1}' for i in range(len(df.columns))]
-                    
-                # For debugging, show the column names
-                st.write("Detected columns:", list(df.columns))
-                    
-            elif file_type == 'txt':
-                df = pd.read_table(uploaded_file)
-            elif file_type in ['xlsx', 'xls']:
-                df = pd.read_excel(uploaded_file)
+            # Add options for CSV parsing
+            header_option = st.selectbox("Header row", ["First row is header", "No header"])
+            header = 0 if header_option == "First row is header" else None
+            df = pd.read_table(uploaded_file, delimiter=delimiter, header=header, quotechar='"', dtype=float)
         except Exception as e:
             st.error(f"Error reading file: {e}")
             st.stop()
@@ -106,13 +59,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
     
     if len(numeric_columns) > 0:
         with col2:
-            # Add SciencePlots theme if available
-            if HAS_SCIENCEPLOTS:
-                theme_options = ["Default Matplotlib", "Science"]
-            else:
-                theme_options = ["Default Matplotlib"]
-                st.info("Install 'SciencePlots' package for additional themes with: pip install SciencePlots")
-            
+            theme_options = ["Default Matplotlib", "Science"]
             theme_option = st.selectbox("Theme", theme_options)
         
         # Different plot types need different column selections
@@ -194,9 +141,6 @@ if uploaded_file is not None or (use_example_data and df is not None):
 
             equal_axes = st.checkbox("Equal Axes Scales", False)
 
-            
-        # NEW: Equal axes option
-
         # Custom axis labels
         col1, col2 = st.columns(2)
         with col1:
@@ -210,7 +154,7 @@ if uploaded_file is not None or (use_example_data and df is not None):
            (plot_type == "Heatmap" and y_cols):
             
             # Apply the selected theme
-            if theme_option == "Science" and HAS_SCIENCEPLOTS:
+            if theme_option == "Science":
                 plt.style.use(['science', 'no-latex'])
             else:
                 plt.style.use('default')
@@ -361,79 +305,14 @@ if uploaded_file is not None or (use_example_data and df is not None):
                 if title:
                     ax.set_title(title)
 
-                _, col, _ = st.columns([1, 2, 1])
-
-                # Display the plot
-                with col:
-                    st.pyplot(fig)
+                st.pyplot(fig)
                 
                 # Show statistics only if checkbox is checked
                 show_stats = st.checkbox("Show Statistics", False)
                 
                 if show_stats:
-                    st.subheader("Data Statistics")
-                    
-                    # Create tabs for different statistics
-                    stats_tab1, stats_tab2 = st.tabs(["Basic Stats", "Correlations"])
-                    
-                    with stats_tab1:
-                        if plot_type in ["Line", "Scatter", "Bar"]:
-                            # For X-Y plots, show stats for both X and Y columns
-                            st.write("#### X-axis Statistics")
-                            st.write(filtered_df[x_col].describe().to_frame().T)
-                            
-                            st.write("#### Y-axis Statistics")
-                            y_stats = filtered_df[y_cols].describe().T
-                            st.write(y_stats)
-                            
-                            # Add range (max-min) to the statistics
-                            st.write("#### Value Ranges")
-                            ranges = pd.DataFrame({
-                                'Column': [x_col] + y_cols,
-                                'Range (Max-Min)': [filtered_df[x_col].max() - filtered_df[x_col].min()] + 
-                                                [filtered_df[col].max() - filtered_df[col].min() for col in y_cols],
-                                'IQR (Q3-Q1)': [filtered_df[x_col].quantile(0.75) - filtered_df[x_col].quantile(0.25)] + 
-                                            [filtered_df[col].quantile(0.75) - filtered_df[col].quantile(0.25) for col in y_cols]
-                            }).set_index('Column')
-                            st.write(ranges)
-                            
-                        elif plot_type in ["Histogram", "Box"]:
-                            # For single variable plots
-                            st.write(filtered_df[y_cols].describe().T)
-                            
-                            # Add range and IQR
-                            st.write("#### Value Ranges")
-                            ranges = pd.DataFrame({
-                                'Column': y_cols,
-                                'Range (Max-Min)': [filtered_df[col].max() - filtered_df[col].min() for col in y_cols],
-                                'IQR (Q3-Q1)': [filtered_df[col].quantile(0.75) - filtered_df[col].quantile(0.25) for col in y_cols]
-                            }).set_index('Column')
-                            st.write(ranges)
-                            
-                        elif plot_type == "Heatmap":
-                            st.write(filtered_df[y_cols].describe().T)
-                    
-                    with stats_tab2:
-                        # Correlation information
-                        if plot_type in ["Line", "Scatter", "Bar"]:
-                            columns_to_correlate = [x_col] + y_cols
-                        else:
-                            columns_to_correlate = y_cols
-                        
-                        if len(columns_to_correlate) > 1:
-                            corr_matrix = filtered_df[columns_to_correlate].corr()
-                            st.write("#### Pearson Correlation Matrix")
-                            st.write(corr_matrix)
-                            
-                            if len(columns_to_correlate) <= 10:  # Spearman can be computationally intensive
-                                try:
-                                    spearman_corr = filtered_df[columns_to_correlate].corr(method='spearman')
-                                    st.write("#### Spearman Rank Correlation")
-                                    st.write(spearman_corr)
-                                except:
-                                    st.warning("Could not compute Spearman correlation.")
-                        else:
-                            st.info("Select more than one column to view correlations.")
+                    display_stats(plot_type, filtered_df, x_col, y_cols)
+
                 
                 # Export options
                 st.subheader("Export Plot")
@@ -448,19 +327,11 @@ if uploaded_file is not None or (use_example_data and df is not None):
                     return base64.b64encode(buf.read()).decode()
                 
                 with col1:
-                    if st.button("Export as PNG"):
-                        png_data = get_download_link(fig, 'png')
-                        st.markdown(f'<a href="data:image/png;base64,{png_data}" download="plot.png">Download PNG</a>', unsafe_allow_html=True)
-                
+                    st.download_button(label="Export as PNG", data=get_download_link(fig, 'png'), file_name="plot.png")
                 with col2:
-                    if st.button("Export as SVG"):
-                        svg_data = get_download_link(fig, 'svg')
-                        st.markdown(f'<a href="data:image/svg+xml;base64,{svg_data}" download="plot.svg">Download SVG</a>', unsafe_allow_html=True)
-                
+                    st.download_button(label="Export as SVG", data=get_download_link(fig, 'svg'), file_name="plot.svg")
                 with col3:
-                    if st.button("Export as PDF"):
-                        pdf_data = get_download_link(fig, 'pdf')
-                        st.markdown(f'<a href="data:application/pdf;base64,{pdf_data}" download="plot.pdf">Download PDF</a>', unsafe_allow_html=True)
+                    st.download_button(label="Export as PDF", data=get_download_link(fig, 'pdf'), file_name="plot.pdf")
                 
             except Exception as e:
                 st.error(f"Error generating plot: {e}")
@@ -474,19 +345,6 @@ if uploaded_file is not None or (use_example_data and df is not None):
         st.error("No numeric columns found in the dataset for plotting.")
 else:
     st.info("Please upload a data file or use the example data to get started.")
-
-st.markdown("""
-### Supported Features:
-- CSV, TXT, and Excel file parsing
-- Multiple plot types: Line, Scatter, Bar, Histogram, Box, and Heatmap
-- Data filtering by percentile ranges
-- Customizable plot parameters (title, axis labels, grid, scales)
-- Linear and logarithmic axis scales
-- Equal axes option for proportional plotting
-- Scientific plotting styles (requires SciencePlots package)
-- Optional statistics display
-- Export to PNG, SVG, and PDF formats
-""")
 
 # Add a footer with date information
 st.markdown("""
