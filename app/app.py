@@ -346,7 +346,20 @@ if uploaded_file is not None or (use_example_data and df is not None):
                             
                         # Get custom label if specified, otherwise use column name
                         label = custom_labels.get(col, col) if show_legend else "_nolegend_"
-                        ax.plot(filtered_df[x_col], filtered_df[col], label=label)
+
+                                # MODIFIED CODE: Special handling for FFT line plots to prevent connecting first and last points
+                        if use_fft and fft_mode == "Two-sided":
+                            # Sort by x-values to ensure proper line connection
+                            x_data = filtered_df[x_col]
+                            y_data = filtered_df[col]
+                            # Sort data by frequency to ensure proper plotting order
+                            sorted_indices = np.argsort(x_data)
+                            x_data = x_data.iloc[sorted_indices]
+                            y_data = y_data.iloc[sorted_indices]
+                            ax.plot(x_data, y_data, label=label)
+                        else:
+                            # Regular line plotting for non-FFT or one-sided FFT
+                            ax.plot(filtered_df[x_col], filtered_df[col], label=label)
                     
                     ax.grid(grid)
                     # Set custom axis labels
